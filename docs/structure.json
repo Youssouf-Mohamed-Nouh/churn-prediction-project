@@ -1,0 +1,34 @@
+
+Fichier CSV déposé dans S3 (raw/),scripts,processud,models,predictions,temps
+                        │                                                   
+                        ▼                                                   
+        EventBridge ① (s3-trigger-raw-churn)                    
+        Détecte "Object Created" dans raw/                      
+                        │                                                   
+                        ▼                                                   
+        Lambda ① (trigger-raw-churn-lambda)                     
+        Lance le Crawler → glue.start_crawler()                 
+                        │                                                   
+                        ▼                                                   
+        Glue Crawler (crawler-raw-churn)                        
+        Scanne raw/ → Crée la table dans le Data Catalog        
+                        │                                                   
+                        ▼ (quand statut = Succeeded)                        
+        EventBridge ② (trigger-job-when-crawler-ends)           
+        Détecte "Glue Crawler State Change" → Succeeded         
+                        │                                                   
+                        ▼                                                   
+        Lambda ② (trigger-glue-job-lambda)                        Lance le Job → glue.start_job_run()                     │
+                        │                                                   
+                        ▼                                                   
+        Glue Job (job-simple-churn)                             
+        PySpark : renomme, nettoie, équilibre → Parquet         
+                        │                                                   
+                        ▼                                                   
+        S3 (processud/) ← Données propres prêtes pour le ML     
+                        │                                                   
+                        ▼                                                   
+        Glue Crawler (crawler-processud-churn)                  
+        → Athena (requêtes SQL) → QuickSight (dashboard)        
+        → SageMaker (entraînement XGBoost → models/)            
+        → SageMaker Batch Transform (prédictions → predictions/)
