@@ -1,34 +1,42 @@
 
 Fichier CSV déposé dans S3 (raw/),scripts,processud,models,predictions,temps
-                        │                                                   
-                        ▼                                                   
-        EventBridge ① (s3-trigger-raw-churn)                    
-        Détecte "Object Created" dans raw/                      
-                        │                                                   
-                        ▼                                                   
-        Lambda ① (trigger-raw-churn-lambda)                     
-        Lance le Crawler → glue.start_crawler()                 
-                        │                                                   
-                        ▼                                                   
-        Glue Crawler (crawler-raw-churn)                        
-        Scanne raw/ → Crée la table dans le Data Catalog        
-                        │                                                   
-                        ▼ (quand statut = Succeeded)                        
-        EventBridge ② (trigger-job-when-crawler-ends)           
-        Détecte "Glue Crawler State Change" → Succeeded         
-                        │                                                   
-                        ▼                                                   
-        Lambda ② (trigger-glue-job-lambda)                        Lance le Job → glue.start_job_run()                     │
-                        │                                                   
-                        ▼                                                   
-        Glue Job (job-simple-churn)                             
-        PySpark : renomme, nettoie, équilibre → Parquet         
-                        │                                                   
-                        ▼                                                   
-        S3 (processud/) ← Données propres prêtes pour le ML     
-                        │                                                   
-                        ▼                                                   
-        Glue Crawler (crawler-processud-churn)                  
-        → Athena (requêtes SQL) → QuickSight (dashboard)        
-        → SageMaker (entraînement XGBoost → models/)            
-        → SageMaker Batch Transform (prédictions → predictions/)
+                        │
+                        ▼
+        EventBridge ① (s3-trigger-raw-churn)
+        Détecte "Object Created" dans raw/
+                        │
+                        ▼
+        Lambda ① (trigger-raw-churn-lambda)
+        Lance le Crawler → glue.start_crawler()
+                        │
+                        ▼
+        Glue Crawler (crawler-raw-churn)
+        Scanne raw/ → Crée la table dans le Data Catalog
+                        │
+                        ▼ (quand statut = Succeeded)
+        EventBridge ② (trigger-job-when-crawler-ends)
+        Détecte "Glue Crawler State Change" → Succeeded
+                        │
+                        ▼
+        Lambda ② (trigger-glue-job-lambda)
+        Lance le Job → glue.start_job_run()
+                        │
+                        ▼
+        Glue Job (job-simple-churn)
+        PySpark : nettoie, équilibre (SMOTE) → Parquet
+                        │
+                        ▼
+        S3 (processud/) ← Données propres prêtes pour le ML
+                        │
+        ┌───────────────┴───────────────────────────────┐
+        ▼                                               ▼
+SageMaker Notebooks (Prototypage)              Glue Crawler (crawler-processud-churn)
+- Exploration, Feature Engineering              │
+- Entraînement initial (XGBoost)                ▼
+- Test du modèle (.pkl)                         Athena (SQL)
+        │                                       │
+        ▼ (Transfert de connaissance)           ▼
+SageMaker Canvas (Industrialisation)      QuickSight (Dashboard)
+- Import des données de processud/              Visualisation
+- Ré-entraînement / Fine-tuning                 
+- Batch Predictions → S3 (predictions/)
